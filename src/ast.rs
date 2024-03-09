@@ -32,7 +32,14 @@ pub enum AddSubOp {
 }
 
 #[derive(Debug, Clone)]
+pub enum MulDivOp {
+    Mul,
+    Div,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expr {
     AddSub(BinOp<AddSubOp>),
+    MulDiv(BinOp<MulDivOp>),
     Primary(PrimaryExpr),
 }
