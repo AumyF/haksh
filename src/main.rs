@@ -1,7 +1,7 @@
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
-use haksh::parse_line;
+use haksh::*;
 
 fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
