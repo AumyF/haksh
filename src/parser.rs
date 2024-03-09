@@ -2,10 +2,8 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, u64},
-    combinator::{eof, map, opt},
-    error::Error,
+    combinator::{eof, map},
     multi::{many1, separated_list0},
-    number::complete::be_u64,
     sequence::{delimited, pair},
     IResult,
 };
