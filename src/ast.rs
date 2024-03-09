@@ -12,6 +12,13 @@ pub enum BoolLiteral {
 }
 
 #[derive(Debug, Clone)]
+pub struct BinOp<T> {
+    pub left: Box<Expr>,
+    pub op: T,
+    pub right: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AddSub {
     pub left: Box<Expr>,
     pub op: AddSubOp,
@@ -26,6 +33,6 @@ pub enum AddSubOp {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    AddSub(AddSub),
+    AddSub(BinOp<AddSubOp>),
     Primary(PrimaryExpr),
 }

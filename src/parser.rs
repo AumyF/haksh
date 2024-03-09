@@ -20,7 +20,7 @@ fn expr(input: &str) -> IResult<&str, Expr> {
     alt((map(add_sub, Expr::AddSub), map(primary_expr, Expr::Primary)))(input)
 }
 
-fn add_sub(input: &str) -> IResult<&str, AddSub> {
+fn add_sub(input: &str) -> IResult<&str, BinOp<AddSubOp>> {
     let add = map(char('+'), |_| AddSubOp::Add);
     let sub = map(char('-'), |_| AddSubOp::Sub);
     let op = alt((add, sub));
@@ -35,12 +35,12 @@ fn add_sub(input: &str) -> IResult<&str, AddSub> {
         |(first, rest)| {
             let (op1, right1) = rest.first().cloned().unwrap();
             (&rest[1..]).into_iter().fold(
-                AddSub {
+                BinOp {
                     left: Box::new(Expr::Primary(first)),
                     op: op1,
                     right: Box::new(Expr::Primary(right1)),
                 },
-                |acc, e| AddSub {
+                |acc, e| BinOp {
                     left: Box::new(Expr::AddSub(acc)),
                     op: e.0.clone(),
                     right: Box::new(Expr::Primary(e.1.clone())),
