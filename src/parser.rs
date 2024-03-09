@@ -11,14 +11,13 @@ use nom::{
 use crate::ast::*;
 
 type Line = Expr;
+
 pub fn parse_line(input: &str) -> IResult<&str, Line> {
-    map(
-        pair(
-            alt((map(add_sub, Expr::AddSub), map(primary_expr, Expr::Primary))),
-            eof,
-        ),
-        |(li, _)| li,
-    )(input)
+    map(pair(expr, eof), |(li, _)| li)(input)
+}
+
+fn expr(input: &str) -> IResult<&str, Expr> {
+    alt((map(add_sub, Expr::AddSub), map(primary_expr, Expr::Primary)))(input)
 }
 
 fn add_sub(input: &str) -> IResult<&str, AddSub> {
@@ -64,7 +63,7 @@ pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     alt((pb, block, u))(input)
 }
 
-fn block(input: &str) -> IResult<&str, Vec<PrimaryExpr>> {
-    let inner = separated_list0(char(';'), primary_expr);
+fn block(input: &str) -> IResult<&str, Vec<Expr>> {
+    let inner = separated_list0(char(';'), expr);
     delimited(char('{'), inner, char('}'))(input)
 }

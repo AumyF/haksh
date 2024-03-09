@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum PrimaryExpr {
     Bool(BoolLiteral),
-    Block { expr: Vec<PrimaryExpr> },
+    Block { expr: Vec<Expr> },
     DecimalInt(u64),
 }
 
