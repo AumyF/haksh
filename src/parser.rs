@@ -1,10 +1,10 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, u64},
+    character::complete::{char, space0, u64},
     combinator::{eof, map},
     multi::{many1, separated_list0},
-    sequence::{delimited, pair},
+    sequence::{delimited, pair, terminated},
     IResult,
 };
 
@@ -21,15 +21,15 @@ fn expr(input: &str) -> IResult<&str, Expr> {
 }
 
 fn add_sub(input: &str) -> IResult<&str, AddSub> {
+    let add = map(char('+'), |_| AddSubOp::Add);
+    let sub = map(char('-'), |_| AddSubOp::Sub);
+    let op = alt((add, sub));
     map(
         pair(
-            primary_expr,
+            terminated(primary_expr, space0),
             many1(pair(
-                alt((
-                    map(char('+'), |_| AddSubOp::Add),
-                    map(char('-'), |_| AddSubOp::Sub),
-                )),
-                primary_expr,
+                terminated(op, space0),
+                terminated(primary_expr, space0),
             )),
         ),
         |(first, rest)| {
