@@ -1,12 +1,11 @@
 #[derive(Debug, Clone)]
 pub enum PrimaryExpr {
-    Epsilon,
     Bool(BoolLiteral),
     Block { expr: Vec<PrimaryExpr> },
     DecimalInt(u64),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BoolLiteral {
     True,
     False,

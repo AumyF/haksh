@@ -14,10 +14,11 @@ fn main() -> Result<()> {
                 match result {
                     Ok(t) => {
                         println!("Parsed: {:?}", t);
-                    },
+                        println!("Evaluated: {:?}", t.1.evaluate());
+                    }
                     Err(e) => {
                         println!("Error: {}", e);
-                    },
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {

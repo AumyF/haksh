@@ -59,10 +59,9 @@ fn pbool(input: &str) -> IResult<&str, BoolLiteral> {
 
 pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let pb = map(pbool, |b| PrimaryExpr::Bool(b));
-    let none = map(eof, |_| PrimaryExpr::Epsilon);
     let block = map(block, |b| PrimaryExpr::Block { expr: b });
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
-    alt((pb, none, block, u))(input)
+    alt((pb, block, u))(input)
 }
 
 fn block(input: &str) -> IResult<&str, Vec<PrimaryExpr>> {
