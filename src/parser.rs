@@ -5,16 +5,17 @@ use nom::{
     combinator::{eof, map},
     error::ParseError,
     multi::{many1, separated_list0},
-    sequence::{delimited, pair, terminated},
+    sequence::{delimited, pair, terminated, tuple},
     IResult, Parser,
 };
+use nom_regex::str::re_find;
 
 use crate::ast::*;
 
-type Line = Expr;
+type Line = BlockElement;
 
 pub fn parse_line(input: &str) -> IResult<&str, Line> {
-    map(pair(expr, eof), |(li, _)| li)(input)
+    map(pair(block_element, eof), |(li, _)| li)(input)
 }
 
 fn expr(input: &str) -> IResult<&str, Expr> {
@@ -87,10 +88,40 @@ pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let pb = map(pbool, |b| PrimaryExpr::Bool(b));
     let block = map(block, |b| PrimaryExpr::Block { expr: b });
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
-    alt((pb, block, u))(input)
+    let id = map(identifer, |id| PrimaryExpr::Identifier(id));
+    alt((pb, block, u, id))(input)
 }
 
-fn block(input: &str) -> IResult<&str, Vec<Expr>> {
-    let inner = separated_list0(char(';'), expr);
+fn identifer(input: &str) -> IResult<&str, String> {
+    let re = regex::Regex::new(r"\p{XID_Start}\p{XID_Continue}*").unwrap();
+    let ident = re_find(re);
+
+    ident(input).map(|(s, i)| (s, i.to_string()))
+}
+
+fn block_element(input: &str) -> IResult<&str, BlockElement> {
+    let block_element_var = map(
+        tuple((
+            tag("let"),
+            space0,
+            identifer,
+            space0,
+            tag("="),
+            space0,
+            expr,
+        )),
+        |(_let, _, ident, _, _eq, _, def)| BlockElement::Var {
+            name: ident.to_string(),
+            def,
+        },
+    );
+    let expr = map(expr, BlockElement::Expr);
+    let mut block_element = alt((block_element_var, expr));
+
+    block_element(input)
+}
+
+fn block(input: &str) -> IResult<&str, Vec<BlockElement>> {
+    let inner = separated_list0(char(';'), block_element);
     delimited(char('{'), inner, char('}'))(input)
 }

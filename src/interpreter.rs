@@ -4,6 +4,9 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone)]
 pub struct Properties(BTreeMap<String, Value>);
 
+#[derive(Debug, Clone)]
+pub struct Environment(BTreeMap<String, Value>);
+
 impl Properties {
     pub fn new() -> Properties {
         Properties(BTreeMap::new())
@@ -13,6 +16,20 @@ impl Properties {
     }
     pub fn set(&mut self, name: &str, value: Value) {
         self.0.insert(name.to_string(), value);
+    }
+}
+
+impl Environment {
+    pub fn new() -> Environment {
+        Environment(BTreeMap::new())
+    }
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.0.get(name)
+    }
+    pub fn set(&self, name: &str, value: Value) -> Environment {
+        let mut new = self.clone();
+        new.0.insert(name.to_string(), value);
+        new
     }
 }
 
@@ -42,13 +59,32 @@ impl BoolLiteral {
 }
 
 impl PrimaryExpr {
-    fn evaluate(&self) -> EvalResult {
+    fn evaluate(&self, env: &Environment) -> EvalResult {
         match self {
             PrimaryExpr::Bool(b) => Ok(b.evaluate()),
-            PrimaryExpr::Block { expr } => {
-                expr.iter().fold(Ok(Value::Unit), |_, expr| expr.evaluate())
-            }
+            PrimaryExpr::Block { expr } => Ok(expr
+                .iter()
+                .try_fold((env.clone(), Value::Unit), |(env, _), expr| {
+                    expr.evaluate(&env)
+                })?
+                .1),
             PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
+            PrimaryExpr::Identifier(name) => env
+                .get(name)
+                .cloned()
+                .ok_or(format!("no variable named {name} found")),
+        }
+    }
+}
+
+impl BlockElement {
+    pub fn evaluate(&self, env: &Environment) -> Result<(Environment, Value), String> {
+        match self {
+            BlockElement::Expr(e) => Ok((env.clone(), e.evaluate(env)?)),
+            BlockElement::Var { name, def } => {
+                let env = env.set(name, def.evaluate(env)?);
+                Ok((env, Value::Unit))
+            }
         }
     }
 }
@@ -59,9 +95,9 @@ pub trait BinaryOperator: Sized {
 }
 
 impl<T: BinaryOperator> BinOp<T> {
-    fn evaluate(&self) -> EvalResult {
-        let left = self.left.evaluate()?;
-        let right = self.right.evaluate()?;
+    fn evaluate(&self, env: &Environment) -> EvalResult {
+        let left = self.left.evaluate(env)?;
+        let right = self.right.evaluate(env)?;
         self.op.op(left, right)
     }
 }
@@ -76,7 +112,7 @@ impl BinaryOperator for AddSubOp {
         };
         Ok(Value::UInt64(result))
     }
-    fn into_expr() -> impl Fn(BinOp<AddSubOp>) -> Expr{
+    fn into_expr() -> impl Fn(BinOp<AddSubOp>) -> Expr {
         Expr::AddSub
     }
 }
@@ -99,13 +135,12 @@ impl BinaryOperator for MulDivOp {
     }
 }
 
-
 impl Expr {
-    pub fn evaluate(&self) -> EvalResult {
+    pub fn evaluate(&self, env: &Environment) -> EvalResult {
         match self {
-            Expr::AddSub(e) => e.evaluate(),
-            Expr::MulDiv(e) => e.evaluate(),
-            Expr::Primary(e) => e.evaluate(),
+            Expr::AddSub(e) => e.evaluate(env),
+            Expr::MulDiv(e) => e.evaluate(env),
+            Expr::Primary(e) => e.evaluate(env),
         }
     }
 }

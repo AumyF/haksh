@@ -1,8 +1,9 @@
 #[derive(Debug, Clone)]
 pub enum PrimaryExpr {
     Bool(BoolLiteral),
-    Block { expr: Vec<Expr> },
+    Block { expr: Vec<BlockElement> },
     DecimalInt(u64),
+    Identifier(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +36,12 @@ pub enum AddSubOp {
 pub enum MulDivOp {
     Mul,
     Div,
+}
+
+#[derive(Debug, Clone)]
+pub enum BlockElement {
+    Expr(Expr),
+    Var { name: String, def: Expr },
 }
 
 #[derive(Debug, Clone)]

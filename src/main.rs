@@ -6,6 +6,7 @@ use haksh::parser::parse_line;
 fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
 
+    let mut env = haksh::interpreter::Environment::new();
     loop {
         let readline = rl.readline("haksh >> ");
         match readline {
@@ -14,7 +15,14 @@ fn main() -> Result<()> {
                 match result {
                     Ok(t) => {
                         println!("Parsed: {:?}", t);
-                        println!("Evaluated: {:?}", t.1.evaluate());
+
+                        match t.1.evaluate(&env) {
+                            Ok((new_env, value)) => {
+                                env = new_env;
+                                println!("{:?}", value);
+                            }
+                            Err(e) => println!("Error: {e}"),
+                        }
                     }
                     Err(e) => {
                         println!("Error: {}", e);
