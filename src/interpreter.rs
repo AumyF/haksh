@@ -39,6 +39,7 @@ pub enum Value {
     UInt64(u64),
     Bool(bool),
     Unit,
+    String(String),
 }
 
 impl Value {
@@ -135,12 +136,38 @@ impl BinaryOperator for MulDivOp {
     }
 }
 
+impl FunctionApplication {
+    fn evaluate(&self, env: &Environment) -> EvalResult {
+        match self.fident.clone() {
+            i if i
+                == Identifier {
+                    path: "fs".to_string(),
+                    child: Some(Box::new(Identifier {
+                        path: "cwd".to_string(),
+                        child: None,
+                    })),
+                } =>
+            {
+                let current_dir = std::env::current_dir().map_err(|e| "IOError")?;
+
+                Ok(current_dir
+                    .to_str()
+                    .ok_or(format!("to_str error"))
+                    .map(|s| Value::String(s.to_string()))?)
+            }
+
+            _ => Err("Not found".to_string()),
+        }
+    }
+}
+
 impl Expr {
     pub fn evaluate(&self, env: &Environment) -> EvalResult {
         match self {
             Expr::AddSub(e) => e.evaluate(env),
             Expr::MulDiv(e) => e.evaluate(env),
             Expr::Primary(e) => e.evaluate(env),
+            Expr::FunctionApplication(e) => e.evaluate(env),
         }
     }
 }

@@ -1,16 +1,17 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, space0, u64},
+    character::complete::{char, space0, space1, u64},
     combinator::{eof, map},
     error::ParseError,
-    multi::{many1, separated_list0},
-    sequence::{delimited, pair, terminated, tuple},
+    multi::{many1, separated_list0, separated_list1},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     IResult, Parser,
 };
 use nom_regex::str::re_find;
 
 use crate::ast::*;
+use std::collections::BTreeMap;
 
 type Line = BlockElement;
 
@@ -20,8 +21,7 @@ pub fn parse_line(input: &str) -> IResult<&str, Line> {
 
 fn expr(input: &str) -> IResult<&str, Expr> {
     alt((
-        map(add_sub, Expr::AddSub),
-        map(mul_div, Expr::MulDiv),
+        map(function_application, Expr::FunctionApplication),
         map(primary_expr, Expr::Primary),
     ))(input)
 }
@@ -76,6 +76,53 @@ fn mul_div(input: &str) -> IResult<&str, BinOp<MulDivOp>> {
     let sub = map(char('/'), |_| MulDivOp::Div);
     let op = alt((add, sub));
     binop(term, op)(input)
+}
+
+fn function_application(input: &str) -> IResult<&str, FunctionApplication> {
+    enum Type {
+        Option(String, PrimaryExpr),
+        Arg(PrimaryExpr),
+    }
+    let identifier = separated_list1(char('.'), identifer);
+    let identifier = map(identifier, |i| {
+        let mut i = i.iter().rev();
+        let a = i.next().unwrap();
+        i.fold(
+            Identifier {
+                child: None,
+                path: a.to_string(),
+            },
+            |acc, path| Identifier {
+                child: Some(Box::new(acc)),
+                path: path.to_string(),
+            },
+        )
+    });
+
+    let option = preceded(tag("--"), pair(identifer, primary_expr));
+    let option = map(option, |(k, v)| Type::Option(k, v));
+    let arg = map(primary_expr, Type::Arg);
+    let opargs = separated_list0(space1, alt((option, arg)));
+
+    let r = tuple((identifier, opargs));
+    map(r, |(fident, opargs)| {
+        let mut args = Vec::new();
+        let mut options = BTreeMap::new();
+        for e in opargs {
+            match e {
+                Type::Arg(a) => args.push(a),
+                Type::Option(k, v) => {
+                    options.insert(k, v);
+                }
+            }
+        }
+
+        FunctionApplication {
+            args,
+            options,
+            fident,
+        }
+    })(input)
 }
 
 fn pbool(input: &str) -> IResult<&str, BoolLiteral> {

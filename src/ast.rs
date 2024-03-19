@@ -44,9 +44,23 @@ pub enum BlockElement {
     Var { name: String, def: Expr },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Identifier {
+    pub child: Option<Box<Identifier>>,
+    pub path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionApplication {
+    pub fident: Identifier,
+    pub options: std::collections::BTreeMap<String, PrimaryExpr>,
+    pub args: Vec<PrimaryExpr>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     AddSub(BinOp<AddSubOp>),
     MulDiv(BinOp<MulDivOp>),
     Primary(PrimaryExpr),
+    FunctionApplication(FunctionApplication),
 }
