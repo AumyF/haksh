@@ -155,6 +155,23 @@ impl FunctionApplication {
                     .ok_or(format!("to_str error"))
                     .map(|s| Value::String(s.to_string()))?)
             }
+            i if i
+                == Identifier {
+                    path: "println".to_string(),
+                    child: None,
+                } =>
+            {
+                // 遅そう
+                let s = self
+                    .args
+                    .iter()
+                    .map(|a| Ok(format!("{:?}", a.evaluate(env)?)))
+                    .collect::<Result<Vec<_>, String>>()?
+                    .join(" ");
+                println!("{s}");
+
+                Ok(Value::Unit)
+            }
 
             _ => Err("Not found".to_string()),
         }

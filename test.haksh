@@ -1,2 +1,2 @@
-fs.cwd
-fs.cwd
+println {fs.cwd}
+println {fs.cwd}
