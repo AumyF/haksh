@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, space0, space1, u64},
+    character::complete::{char, multispace0, space0, space1, u64, line_ending},
     combinator::{eof, map},
     error::ParseError,
     multi::{many1, separated_list0, separated_list1},
@@ -32,6 +32,12 @@ fn add_sub(input: &str) -> IResult<&str, BinOp<AddSubOp>> {
     let op = alt((add, sub));
     let term = |input| alt((map(mul_div, Expr::MulDiv), map(primary_expr, Expr::Primary)))(input);
     binop(term, op)(input)
+}
+
+fn space<'t, O, E: ParseError<&'t str>>(
+    p: fn(&'t str) -> IResult<&'t str, O, E>,
+) -> impl Fn(&'t str) -> IResult<&'t str, O, E> {
+    move |input| delimited(space0, p, space0)(input)
 }
 
 fn binop<'t, Op: crate::interpreter::BinaryOperator, E: ParseError<&'t str>, G>(
@@ -78,13 +84,16 @@ fn mul_div(input: &str) -> IResult<&str, BinOp<MulDivOp>> {
     binop(term, op)(input)
 }
 
+fn function_name(input: &str) -> IResult<&str, Vec<String>> {
+    separated_list1(char('.'), identifer)(input)
+}
+
 fn function_application(input: &str) -> IResult<&str, FunctionApplication> {
     enum Type {
         Option(String, PrimaryExpr),
         Arg(PrimaryExpr),
     }
-    let identifier = separated_list1(char('.'), identifer);
-    let identifier = map(identifier, |i| {
+    let identifier = map(space(function_name), |i| {
         let mut i = i.iter().rev();
         let a = i.next().unwrap();
         i.fold(
@@ -99,10 +108,10 @@ fn function_application(input: &str) -> IResult<&str, FunctionApplication> {
         )
     });
 
-    let option = preceded(tag("--"), pair(identifer, primary_expr));
-    let option = map(option, |(k, v)| Type::Option(k, v));
+    // let option = preceded(tag("--"), pair(space(identifer), space(primary_expr)));
+    // let option = map(option, |(k, v)| Type::Option(k, v));
     let arg = map(primary_expr, Type::Arg);
-    let opargs = separated_list0(space1, alt((option, arg)));
+    let opargs = separated_list0(space1, arg);
 
     let r = tuple((identifier, opargs));
     map(r, |(fident, opargs)| {
@@ -125,6 +134,24 @@ fn function_application(input: &str) -> IResult<&str, FunctionApplication> {
     })(input)
 }
 
+#[test]
+fn test_fa() {
+    let (i, _) = function_application(
+        r#"fs.cwd;
+fs.cwd"#,
+    )
+    .unwrap();
+    assert_eq!(
+        i,
+        r#";
+fs.cwd"#
+    )
+}
+#[test]
+fn test_fab() {
+    let (i, _) = function_application(r#"fs.cwd;fs.cwd"#).unwrap();
+    assert_eq!(i, r#";fs.cwd"#)
+}
 fn pbool(input: &str) -> IResult<&str, BoolLiteral> {
     let pf = map(tag("false"), |_| BoolLiteral::False);
     let pt = map(tag("true"), |_| BoolLiteral::True);
@@ -139,11 +166,31 @@ pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     alt((pb, block, u, id))(input)
 }
 
+
 fn identifer(input: &str) -> IResult<&str, String> {
-    let re = regex::Regex::new(r"\p{XID_Start}\p{XID_Continue}*").unwrap();
+    let re = regex::Regex::new(r"^\p{XID_Start}\p{XID_Continue}*").unwrap();
     let ident = re_find(re);
 
     ident(input).map(|(s, i)| (s, i.to_string()))
+}
+
+#[test]
+fn test_i() {
+    let (i, _) = identifer(
+        r#"fs;
+fs.cwd"#,
+    )
+    .unwrap();
+    assert_eq!(
+        i,
+        r#";
+fs.cwd"#
+    );
+
+    let mut s = separated_list1(char('.'), identifer);
+
+    let (i, _) = s("fs.cwd;hoge").unwrap();
+    assert_eq!(i, ";hoge");
 }
 
 fn block_element(input: &str) -> IResult<&str, BlockElement> {
@@ -168,7 +215,14 @@ fn block_element(input: &str) -> IResult<&str, BlockElement> {
     block_element(input)
 }
 
+fn block_inner(input: &str) -> IResult<&str, Vec<BlockElement>> {
+    separated_list0(alt((char(';'), char('\n'))), block_element)(input)
+}
+
+pub fn parse_file(input: &str) -> IResult<&str, Vec<BlockElement>> {
+    terminated(block_inner, pair(multispace0, eof))(input)
+}
+
 fn block(input: &str) -> IResult<&str, Vec<BlockElement>> {
-    let inner = separated_list0(char(';'), block_element);
-    delimited(char('{'), inner, char('}'))(input)
+    delimited(char('{'), block_inner, char('}'))(input)
 }

@@ -1,12 +1,13 @@
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
-use haksh::parser::parse_line;
+use haksh::interpreter::Environment;
+use haksh::parser::{parse_file, parse_line};
 
-fn main() -> Result<()> {
+fn repl() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
 
-    let mut env = haksh::interpreter::Environment::new();
+    let mut env = Environment::new();
     loop {
         let readline = rl.readline("haksh >> ");
         match readline {
@@ -45,4 +46,38 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Debug)]
+struct InterpretError {
+    msg: String,
+}
+impl std::fmt::Display for InterpretError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InterpretError: {}", self.msg)
+    }
+}
+impl std::error::Error for InterpretError {}
+
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<_> = std::env::args().collect();
+    let file = args.get(1);
+
+    match file {
+        Some(file) => {
+            let file = std::fs::read_to_string(file).unwrap();
+            let (_, file) = parse_file(&file).unwrap();
+            let env = Environment::new();
+            let r = file
+                .iter()
+                .try_fold(env, |env, line| {
+                    let (env, _) = line.evaluate(&env).map_err(|msg| InterpretError { msg })?;
+                    Ok::<Environment, InterpretError>(env)
+                })
+                .map(|_| ());
+
+            Ok(r.map_err(Box::new)?)
+        }
+        None => Ok(repl().map_err(Box::new)?),
+    }
 }
