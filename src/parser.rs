@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, multispace0, space0, space1, u64, line_ending},
+    character::complete::{char, line_ending, multispace0, space0, space1, u64},
     combinator::{eof, map},
     error::ParseError,
     multi::{many1, separated_list0, separated_list1},
@@ -160,12 +160,11 @@ fn pbool(input: &str) -> IResult<&str, BoolLiteral> {
 
 pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let pb = map(pbool, |b| PrimaryExpr::Bool(b));
-    let block = map(block, |b| PrimaryExpr::Block { expr: b });
+    let block = map(block, |b| PrimaryExpr::Block(Block(b)));
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
     let id = map(identifer, |id| PrimaryExpr::Identifier(id));
     alt((pb, block, u, id))(input)
 }
-
 
 fn identifer(input: &str) -> IResult<&str, String> {
     let re = regex::Regex::new(r"^\p{XID_Start}\p{XID_Continue}*").unwrap();
@@ -193,6 +192,22 @@ fs.cwd"#
     assert_eq!(i, ";hoge");
 }
 
+fn block_element_using(input: &str) -> IResult<&str, BlockElement> {
+    let a = tuple((
+        tag("using"),
+        space0,
+        identifer,
+        space0,
+        tag("="),
+        space0,
+        function_application,
+    ));
+    map(a, |(_let, _, ident, _, _eq, _, def)| BlockElement::Using {
+        name: ident.to_string(),
+        def,
+    })(input)
+}
+
 fn block_element(input: &str) -> IResult<&str, BlockElement> {
     let block_element_var = map(
         tuple((
@@ -210,7 +225,7 @@ fn block_element(input: &str) -> IResult<&str, BlockElement> {
         },
     );
     let expr = map(expr, BlockElement::Expr);
-    let mut block_element = alt((block_element_var, expr));
+    let mut block_element = alt((block_element_var, block_element_using, expr));
 
     block_element(input)
 }
@@ -219,8 +234,9 @@ fn block_inner(input: &str) -> IResult<&str, Vec<BlockElement>> {
     separated_list0(alt((char(';'), char('\n'))), block_element)(input)
 }
 
-pub fn parse_file(input: &str) -> IResult<&str, Vec<BlockElement>> {
-    terminated(block_inner, pair(multispace0, eof))(input)
+pub fn parse_file(input: &str) -> IResult<&str, Block> {
+    let a = terminated(block_inner, pair(multispace0, eof));
+    map(a, |v| Block(v))(input)
 }
 
 fn block(input: &str) -> IResult<&str, Vec<BlockElement>> {

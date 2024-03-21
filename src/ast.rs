@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum PrimaryExpr {
     Bool(BoolLiteral),
-    Block { expr: Vec<BlockElement> },
+    Block (Block),
     DecimalInt(u64),
     Identifier(String),
 }
@@ -42,7 +42,18 @@ pub enum MulDivOp {
 pub enum BlockElement {
     Expr(Expr),
     Var { name: String, def: Expr },
+    Using { name: String, def: FunctionApplication },
+    AnonymousFunction (AnonymousFunction),
 }
+#[derive(Debug , Clone)]
+pub struct Block(pub Vec<BlockElement>);
+
+#[derive(Debug, Clone)]
+pub struct AnonymousFunction {
+   pub params: Vec<String>,
+    pub body: Block,
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {

@@ -17,7 +17,7 @@ fn repl() -> Result<()> {
                     Ok(t) => {
                         println!("Parsed: {:?}", t);
 
-                        match t.1.evaluate(&env) {
+                        match t.1.evaluate_for_repl(&env) {
                             Ok((new_env, value)) => {
                                 env = new_env;
                                 println!("{:?}", value);
@@ -68,15 +68,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let file = std::fs::read_to_string(file).unwrap();
             let (_, file) = parse_file(&file).unwrap();
             let env = Environment::new();
-            let r = file
-                .iter()
-                .try_fold(env, |env, line| {
-                    let (env, _) = line.evaluate(&env).map_err(|msg| InterpretError { msg })?;
-                    Ok::<Environment, InterpretError>(env)
-                })
-                .map(|_| ());
+            let _ = file
+                .evaluate(&env)
+                .map_err(|msg| Box::new(InterpretError { msg }))?;
 
-            Ok(r.map_err(Box::new)?)
+            Ok(())
         }
         None => Ok(repl().map_err(Box::new)?),
     }

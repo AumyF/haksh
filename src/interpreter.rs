@@ -35,11 +35,19 @@ impl Environment {
 
 #[derive(Debug, Clone)]
 pub enum Value {
-    Compound { properties: Properties },
+    Compound {
+        properties: Properties,
+    },
     UInt64(u64),
     Bool(bool),
     Unit,
     String(String),
+    Fn {
+        env: Environment,
+        body: Block,
+        params: Vec<String>,
+        name: Option<String>,
+    },
 }
 
 impl Value {
@@ -47,6 +55,41 @@ impl Value {
         match self {
             Value::UInt64(n) => Some(*n),
             _ => None,
+        }
+    }
+    fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
+        match self {
+            Value::Fn {
+                env,
+                body,
+                params,
+                name,
+            } => {
+                let env = if let Some(name) = name {
+                    env.set(&name, self.clone())
+                } else {
+                    env.clone()
+                };
+                let env = params
+                    .iter()
+                    .enumerate()
+                    .try_fold(env, |env, (index, name)| {
+                        let arg = arguments.get(index).ok_or_else(|| {
+                            format!(
+                                "Expected {} arguments but got {}",
+                                params.len(),
+                                arguments.len()
+                            )
+                        })?;
+
+                        let env = env.set(name, arg.clone());
+
+                        Ok::<_, String>(env)
+                    })?;
+
+                body.evaluate(&env)
+            }
+            _ => Err("Not fn".to_string()),
         }
     }
 }
@@ -59,33 +102,86 @@ impl BoolLiteral {
     }
 }
 
-impl PrimaryExpr {
-    fn evaluate(&self, env: &Environment) -> EvalResult {
-        match self {
-            PrimaryExpr::Bool(b) => Ok(b.evaluate()),
-            PrimaryExpr::Block { expr } => Ok(expr
-                .iter()
-                .try_fold((env.clone(), Value::Unit), |(env, _), expr| {
-                    expr.evaluate(&env)
-                })?
-                .1),
-            PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
-            PrimaryExpr::Identifier(name) => env
-                .get(name)
-                .cloned()
-                .ok_or(format!("no variable named {name} found")),
+impl Block {
+    pub fn evaluate(&self, env: &Environment) -> EvalResult {
+        fn a(
+            mut expr: std::collections::VecDeque<BlockElement>,
+            env: Environment,
+            value: Value,
+        ) -> EvalResult {
+            Ok(if let Some(e) = expr.pop_front() {
+                match e {
+                    BlockElement::Expr(e) => {
+                        let v = e.evaluate(&env)?;
+                        a(expr, env, v)?
+                    }
+                    BlockElement::Var { name, def } => {
+                        let env = env.set(&name, def.evaluate(&env)?);
+                        a(expr, env, Value::Unit)?
+                    }
+                    BlockElement::AnonymousFunction(AnonymousFunction { params, body }) => a(
+                        expr,
+                        env.clone(),
+                        Value::Fn {
+                            env: env.clone(),
+                            name: None,
+                            params,
+                            body,
+                        },
+                    )?,
+                    BlockElement::Using { name, mut def } => {
+                        def.args.push(PrimaryExpr::Block(Block(vec![
+                            BlockElement::AnonymousFunction(AnonymousFunction {
+                                params: vec![name],
+                                body: Block(expr.into()),
+                            }),
+                        ])));
+
+                        def.evaluate(&env)?
+                    }
+                }
+            } else {
+                value
+            })
         }
+        a(self.0.clone().into(), env.clone(), Value::Unit)
     }
 }
 
 impl BlockElement {
-    pub fn evaluate(&self, env: &Environment) -> Result<(Environment, Value), String> {
+    pub fn evaluate_for_repl(&self, env: &Environment) -> Result<(Environment, Value), String> {
         match self {
             BlockElement::Expr(e) => Ok((env.clone(), e.evaluate(env)?)),
             BlockElement::Var { name, def } => {
                 let env = env.set(name, def.evaluate(env)?);
                 Ok((env, Value::Unit))
             }
+            BlockElement::AnonymousFunction(AnonymousFunction { params, body }) => Ok((
+                env.clone(),
+                Value::Fn {
+                    env: env.clone(),
+                    name: None,
+                    params: params.to_vec(),
+                    body: body.clone(),
+                },
+            )),
+            BlockElement::Using { .. } => {
+                Err("'using' statement does not work in REPL".to_string())
+            }
+        }
+    }
+}
+
+impl PrimaryExpr {
+    fn evaluate(&self, env: &Environment) -> EvalResult {
+        match self {
+            PrimaryExpr::Bool(b) => Ok(b.evaluate()),
+            PrimaryExpr::Block(b) => b.evaluate(&env),
+            PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
+            PrimaryExpr::Identifier(name) => env
+                .get(name)
+                .cloned()
+                .ok_or(format!("no variable named {name} found")),
         }
     }
 }
