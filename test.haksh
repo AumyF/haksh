@@ -1,2 +1,2 @@
-println {fs.cwd}
+using a = twice
 println {fs.cwd}

@@ -109,6 +109,7 @@ impl Block {
             env: Environment,
             value: Value,
         ) -> EvalResult {
+            
             Ok(if let Some(e) = expr.pop_front() {
                 match e {
                     BlockElement::Expr(e) => {
@@ -268,6 +269,17 @@ impl FunctionApplication {
 
                 Ok(Value::Unit)
             }
+            i if i == Identifier {
+                path: "twice".to_string(),
+                child:None,
+            } => {
+                    let continuation = self.args.last().ok_or("no arguments".to_string())?;
+                    let _ =
+                     continuation.evaluate(env)?.try_evaluate_as_fn(vec![Value::Unit])?;
+                    let _ = continuation.evaluate(env)?.try_evaluate_as_fn(vec![Value::Unit])?;
+
+                    Ok(Value::Unit)
+                }
 
             _ => Err("Not found".to_string()),
         }

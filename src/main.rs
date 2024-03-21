@@ -68,9 +68,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let file = std::fs::read_to_string(file).unwrap();
             let (_, file) = parse_file(&file).unwrap();
             let env = Environment::new();
-            let _ = file
+            let v = file
                 .evaluate(&env)
                 .map_err(|msg| Box::new(InterpretError { msg }))?;
+            
+            println!("{v:?}");
 
             Ok(())
         }
