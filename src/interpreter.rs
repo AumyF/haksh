@@ -109,7 +109,6 @@ impl Block {
             env: Environment,
             value: Value,
         ) -> EvalResult {
-            
             Ok(if let Some(e) = expr.pop_front() {
                 match e {
                     BlockElement::Expr(e) => {
@@ -269,17 +268,128 @@ impl FunctionApplication {
 
                 Ok(Value::Unit)
             }
-            i if i == Identifier {
-                path: "twice".to_string(),
-                child:None,
-            } => {
-                    let continuation = self.args.last().ok_or("no arguments".to_string())?;
-                    let _ =
-                     continuation.evaluate(env)?.try_evaluate_as_fn(vec![Value::Unit])?;
-                    let _ = continuation.evaluate(env)?.try_evaluate_as_fn(vec![Value::Unit])?;
+            i if i
+                == Identifier {
+                    path: "twice".to_string(),
+                    child: None,
+                } =>
+            {
+                let continuation = self.args.last().ok_or("no arguments".to_string())?;
+                let _ = continuation
+                    .evaluate(env)?
+                    .try_evaluate_as_fn(vec![Value::Unit])?;
+                let _ = continuation
+                    .evaluate(env)?
+                    .try_evaluate_as_fn(vec![Value::Unit])?;
 
-                    Ok(Value::Unit)
+                Ok(Value::Unit)
+            }
+            i if i
+                == Identifier {
+                    path: "fs".to_string(),
+                    child: Some(Box::new(Identifier {
+                        path: "read".to_string(),
+                        child: None,
+                    })),
+                } =>
+            {
+                use std::fs::File;
+                use std::io::prelude::*;
+                let f = File::open("./latest.log").map_err(|e| e.to_string())?;
+
+                let mut bufr = std::io::BufReader::new(f);
+
+                let mut string = String::new();
+                let cont = self
+                    .args
+                    .last()
+                    .ok_or("no arguments".to_string())?
+                    .evaluate(env)?;
+
+                while let Ok(len) = bufr.read_line(&mut string) {
+                    if len == 0 {
+                        // EOF
+                        break;
+                    }
+
+                    // TODO unwrap
+                    cont.try_evaluate_as_fn(vec![Value::String(string.clone())])
+                        .unwrap();
                 }
+
+                Ok(Value::Unit)
+            }
+
+            i if i
+                == Identifier {
+                    path: "fs".to_string(),
+                    child: Some(Box::new(Identifier {
+                        path: "watch".to_string(),
+                        child: None,
+                    })),
+                } =>
+            {
+                use notify::EventKind;
+                use notify::Watcher;
+                use notify_debouncer_full::DebouncedEvent;
+
+                use std::fs::File;
+                use std::io::{self, BufRead, Read, Seek, SeekFrom};
+
+                let (tx, rx) = std::sync::mpsc::channel();
+
+                let f = File::open("./latest.log").map_err(|e| e.to_string())?;
+
+                let mut bufr = std::io::BufReader::new(f);
+                bufr.seek(SeekFrom::End(0));
+
+                let cont = self
+                    .args
+                    .last()
+                    .ok_or("no arguments".to_string())?
+                    .evaluate(env)?;
+
+                let mut debouncer = notify_debouncer_full::new_debouncer(
+                    std::time::Duration::from_secs(1),
+                    None,
+                    tx,
+                )
+                .map_err(|e| e.to_string())?;
+
+                debouncer
+                    .watcher()
+                    .watch(
+                        std::path::Path::new("./latest.log"),
+                        notify::RecursiveMode::NonRecursive,
+                    )
+                    .map_err(|e| e.to_string())?;
+
+                for res in rx {
+                    match res {
+                        Ok(events) => {
+                            let includes_modify = events.iter().any(|f| match f.kind {
+                                EventKind::Modify(_) => true,
+                                _ => false,
+                            });
+
+                            if includes_modify {
+                                let mut string = String::new();
+                                bufr.read_to_string(&mut string).unwrap();
+                                string.lines().for_each(|line| {
+                                    // TODO error handling
+                                    let _ = cont
+                                        .try_evaluate_as_fn(vec![Value::String(line.to_string())])
+                                        .unwrap();
+                                });
+                            }
+                        }
+                        Err(e) => eprintln!("watch error: {:?}", e),
+                    }
+                }
+
+
+                Ok(Value::Unit)
+            }
 
             _ => Err("Not found".to_string()),
         }
