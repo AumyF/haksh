@@ -57,7 +57,13 @@ impl Value {
             _ => None,
         }
     }
-    fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
+     fn try_get_string(&self) -> Option<String> {
+        match self {
+            Value::String(s) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+ fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
         match self {
             Value::Fn {
                 env,
@@ -290,13 +296,18 @@ impl FunctionApplication {
                 == Identifier {
                     path: "http".to_string(),
                     child: Some(Box::new(Identifier {
-                        path: "post".to_string(),
+                        path: "get".to_string(),
                         child: None,
                     })),
                 } =>
             {
+                    let mut  args = self.args.clone();
+                    let url = args.pop().ok_or("no arguments")?.evaluate(env)?;
+                    let url = url.try_get_string().ok_or(format!("{url:?} is not string"))?;
+
+                    
                 let res =
-                    reqwest::blocking::get("https://example.com").map_err(|e| e.to_string())?;
+                    reqwest::blocking::get(url).map_err(|e| e.to_string())?;
 
                 let body = res.text().map_err(|e| e.to_string())?;
 
