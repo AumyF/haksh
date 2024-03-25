@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag,take_until},
+    bytes::complete::{tag, take_until},
     character::complete::{char, line_ending, multispace0, space0, space1, u64},
     combinator::{eof, map},
     error::ParseError,
@@ -20,7 +20,16 @@ pub fn parse_line(input: &str) -> IResult<&str, Line> {
 }
 
 fn expr(input: &str) -> IResult<&str, Expr> {
+    let pif = tuple((tag("if"),space0, expr,space0, tag("then"),space0, block, space0,tag("else"), space0,block));
+
     alt((
+        map(pif, |(_if, _,cond, _,_then,_, true_exp, _,_else,_, false_expr)| {
+            Expr::If(If {
+                cond: Box::new(cond),
+                true_exp: Box::new(Expr::Primary(PrimaryExpr::Block(Block(true_exp)))),
+                false_expr: Box::new(Expr::Primary(PrimaryExpr::Block(Block(false_expr)))),
+            })
+        }),
         map(function_application, Expr::FunctionApplication),
         map(primary_expr, Expr::Primary),
     ))(input)
@@ -159,11 +168,18 @@ fn pbool(input: &str) -> IResult<&str, BoolLiteral> {
 }
 
 fn pstring(input: &str) -> IResult<&str, String> {
-    map(delimited(char('"'), take_until(r#"""#) ,char('"')), |s: &str| s.to_string())(input)
+    map(
+        delimited(char('"'), take_until(r#"""#), char('"')),
+        |s: &str| s.to_string(),
+    )(input)
 }
 
 fn pcompound(input: &str) -> IResult<&str, std::collections::BTreeMap<String, Expr>> {
-    let p = delimited(char('('), separated_list0(char(','),tuple((identifer, char('='), expr))) ,char(')'));
+    let p = delimited(
+        char('('),
+        separated_list0(char(','), tuple((identifer, char('='), expr))),
+        char(')'),
+    );
     map(p, |e| {
         let mut map = std::collections::BTreeMap::new();
         e.iter().for_each(|(key, _, def)| {
@@ -171,9 +187,7 @@ fn pcompound(input: &str) -> IResult<&str, std::collections::BTreeMap<String, Ex
         });
 
         map
-
     })(input)
-
 }
 
 pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
@@ -182,7 +196,7 @@ pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
     let id = map(identifer, |id| PrimaryExpr::Identifier(id));
     let ps = map(pstring, PrimaryExpr::StringLiteral);
-    let pc =map(pcompound, PrimaryExpr::Compound);
+    let pc = map(pcompound, PrimaryExpr::Compound);
     alt((pb, block, u, id, ps, pc))(input)
 }
 

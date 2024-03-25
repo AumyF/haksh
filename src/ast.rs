@@ -1,12 +1,12 @@
 #[derive(Debug, Clone)]
 pub enum PrimaryExpr {
     Bool(BoolLiteral),
-    Block (Block),
+    Block(Block),
     DecimalInt(u64),
     Identifier(String),
     StringLiteral(String),
-    TaggedString (TaggedString),
-    Compound(std::collections::BTreeMap<String, Expr>)
+    TaggedString(TaggedString),
+    Compound(std::collections::BTreeMap<String, Expr>),
 }
 #[derive(Debug, Clone)]
 pub enum TaggedString {
@@ -48,19 +48,24 @@ pub enum MulDivOp {
 #[derive(Debug, Clone)]
 pub enum BlockElement {
     Expr(Expr),
-    Var { name: String, def: Expr },
-    Using { name: String, def: FunctionApplication },
-    AnonymousFunction (AnonymousFunction),
+    Var {
+        name: String,
+        def: Expr,
+    },
+    Using {
+        name: String,
+        def: FunctionApplication,
+    },
+    AnonymousFunction(AnonymousFunction),
 }
-#[derive(Debug , Clone)]
+#[derive(Debug, Clone)]
 pub struct Block(pub Vec<BlockElement>);
 
 #[derive(Debug, Clone)]
 pub struct AnonymousFunction {
-   pub params: Vec<String>,
+    pub params: Vec<String>,
     pub body: Block,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
@@ -76,9 +81,17 @@ pub struct FunctionApplication {
 }
 
 #[derive(Debug, Clone)]
+pub struct If {
+    pub cond: Box<Expr>,
+    pub true_exp: Box<Expr>,
+    pub false_expr: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expr {
     AddSub(BinOp<AddSubOp>),
     MulDiv(BinOp<MulDivOp>),
     Primary(PrimaryExpr),
     FunctionApplication(FunctionApplication),
+    If(If),
 }

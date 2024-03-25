@@ -37,7 +37,8 @@ impl Environment {
 pub enum Value {
     Compound {
         properties: Properties,
-    },#[serde(skip)]
+    },
+    #[serde(skip)]
     Fn {
         env: Environment,
         body: Block,
@@ -51,7 +52,6 @@ pub enum Value {
     Bool(bool),
     #[serde(untagged)]
     String(String),
-    
 }
 
 impl Value {
@@ -61,7 +61,13 @@ impl Value {
             _ => None,
         }
     }
-     fn try_get_string(&self) -> Option<String> {
+    fn try_get_bool(&self) -> Option<bool> {
+        match self {
+            Value::Bool(n) => Some(*n),
+            _ => None,
+        }
+    }
+    fn try_get_string(&self) -> Option<String> {
         match self {
             Value::String(s) => Some(s.to_string()),
             _ => None,
@@ -70,10 +76,10 @@ impl Value {
     fn try_get_compound(&self) -> Option<Properties> {
         match self {
             Value::Compound { properties } => Some(properties.clone()),
-            _ => None
+            _ => None,
         }
     }
- fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
+    fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
         match self {
             Value::Fn {
                 env,
@@ -195,23 +201,24 @@ impl PrimaryExpr {
             PrimaryExpr::Block(b) => b.evaluate(&env),
             PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
             PrimaryExpr::StringLiteral(s) => Ok(Value::String(s.clone())),
-            PrimaryExpr::TaggedString(ts) => {
-                match ts {
-                    TaggedString::Regex(r) => {
-                        todo!("implement regex");
-                    }
+            PrimaryExpr::TaggedString(ts) => match ts {
+                TaggedString::Regex(r) => {
+                    todo!("implement regex");
                 }
-            }
+            },
             PrimaryExpr::Identifier(name) => env
                 .get(name)
                 .cloned()
                 .ok_or(format!("no variable named {name} found")),
-                PrimaryExpr::Compound(c) => {
-                let a = c.iter().map(|(k, v)| v.evaluate(env).map(|v| (k.to_string(), v))).collect::<Result<std::collections::BTreeMap<_,_>, String>>()?;
+            PrimaryExpr::Compound(c) => {
+                let a = c
+                    .iter()
+                    .map(|(k, v)| v.evaluate(env).map(|v| (k.to_string(), v)))
+                    .collect::<Result<std::collections::BTreeMap<_, _>, String>>()?;
 
-                Ok(Value::Compound{properties:Properties(a)})
-
-
+                Ok(Value::Compound {
+                    properties: Properties(a),
+                })
             }
         }
     }
@@ -325,19 +332,19 @@ impl FunctionApplication {
                     })),
                 } =>
             {
-                    let mut  args = self.args.clone();
-                    let url = args.pop().ok_or("no arguments")?.evaluate(env)?;
-                    let url = url.try_get_string().ok_or(format!("{url:?} is not string"))?;
+                let mut args = self.args.clone();
+                let url = args.pop().ok_or("no arguments")?.evaluate(env)?;
+                let url = url
+                    .try_get_string()
+                    .ok_or(format!("{url:?} is not string"))?;
 
-                    
-                let res =
-                    reqwest::blocking::get(url).map_err(|e| e.to_string())?;
+                let res = reqwest::blocking::get(url).map_err(|e| e.to_string())?;
 
                 let body = res.text().map_err(|e| e.to_string())?;
 
                 Ok(Value::String(body))
             }
-i if i
+            i if i
                 == Identifier {
                     path: "http".to_string(),
                     child: Some(Box::new(Identifier {
@@ -349,23 +356,29 @@ i if i
                     })),
                 } =>
             {
-                let mut  args = self.args.clone();
+                let mut args = self.args.clone();
                 let body = args.pop().ok_or("no arguments")?.evaluate(env)?;
                 let url = args.pop().ok_or("no arguments")?.evaluate(env)?;
-                let url = url.try_get_string().ok_or(format!("{url:?} is not string"))?;
-                let body = body.try_get_compound().ok_or(format!("{url:?} is not compound"))?;
-                
-                let client = reqwest::blocking::Client::new();
-                let body = serde_json::to_string(&body.0).map_err(|e|e.to_string())?;
-                let res = client.post(url).header("Content-Type", "application/json").body(body).send().map_err(|e| e.to_string())?;
+                let url = url
+                    .try_get_string()
+                    .ok_or(format!("{url:?} is not string"))?;
+                let body = body
+                    .try_get_compound()
+                    .ok_or(format!("{url:?} is not compound"))?;
 
-                    
+                let client = reqwest::blocking::Client::new();
+                let body = serde_json::to_string(&body.0).map_err(|e| e.to_string())?;
+                let res = client
+                    .post(url)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .send()
+                    .map_err(|e| e.to_string())?;
 
                 let body = res.text().map_err(|e| e.to_string())?;
 
                 Ok(Value::String(body))
             }
-
 
             i if i
                 == Identifier {
@@ -385,7 +398,14 @@ i if i
 
                 let (tx, rx) = std::sync::mpsc::channel();
 
-                let f = File::open("./latest.log").map_err(|e| e.to_string())?;
+                let f = self
+                    .args
+                    .get(0)
+                    .ok_or("no arguments".to_string())?
+                    .evaluate(env)?
+                    .try_get_string()
+                    .ok_or("expected path string".to_string())?;
+                let f = File::open(f).map_err(|e| e.to_string())?;
 
                 let mut bufr = std::io::BufReader::new(f);
                 bufr.seek(SeekFrom::End(0));
@@ -437,7 +457,33 @@ i if i
                 Ok(Value::Unit)
             }
 
-            _ => Err("Not found".to_string()),
+            id => {
+                let obj = env
+                    .get(&id.path)
+                    .ok_or(format!("no property {}", id.path))?;
+                let a = match obj {
+                    Value::String(s) => {
+                        if id.child.is_some_and(|i| i.path == "includes".to_string()) {
+                            let a = self
+                                .args
+                                .last()
+                                .ok_or("no arguments".to_string())?
+                                .evaluate(env)?
+                                .try_get_string()
+                                .ok_or("not string".to_string())?;
+                            let rg = regex::Regex::new(&a).map_err(|e| e.to_string())?;
+
+                            let b = rg.is_match(s);
+                            Ok(Value::Bool(b))
+                        } else {
+                            Ok(obj.clone())
+                        }
+                    }
+                    _ => Ok(obj.clone()),
+                };
+
+                a
+            }
         }
     }
 }
@@ -449,6 +495,15 @@ impl Expr {
             Expr::MulDiv(e) => e.evaluate(env),
             Expr::Primary(e) => e.evaluate(env),
             Expr::FunctionApplication(e) => e.evaluate(env),
+            Expr::If(e) => {
+                let cond = e.cond.evaluate(env)?;
+                let result = if cond.try_get_bool().ok_or(format!("{cond:?} is not bool"))? {
+                    e.true_exp.evaluate(env)?
+                } else {
+                    e.false_expr.evaluate(env)?
+                };
+                Ok(result)
+            }
         }
     }
 }
