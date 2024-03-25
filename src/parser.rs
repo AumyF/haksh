@@ -162,13 +162,28 @@ fn pstring(input: &str) -> IResult<&str, String> {
     map(delimited(char('"'), take_until(r#"""#) ,char('"')), |s: &str| s.to_string())(input)
 }
 
+fn pcompound(input: &str) -> IResult<&str, std::collections::BTreeMap<String, Expr>> {
+    let p = delimited(char('('), separated_list0(char(','),tuple((identifer, char('='), expr))) ,char(')'));
+    map(p, |e| {
+        let mut map = std::collections::BTreeMap::new();
+        e.iter().for_each(|(key, _, def)| {
+            map.insert(key.clone(), def.clone());
+        });
+
+        map
+
+    })(input)
+
+}
+
 pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let pb = map(pbool, |b| PrimaryExpr::Bool(b));
     let block = map(block, |b| PrimaryExpr::Block(Block(b)));
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
     let id = map(identifer, |id| PrimaryExpr::Identifier(id));
     let ps = map(pstring, PrimaryExpr::StringLiteral);
-    alt((pb, block, u, id, ps))(input)
+    let pc =map(pcompound, PrimaryExpr::Compound);
+    alt((pb, block, u, id, ps, pc))(input)
 }
 
 fn identifer(input: &str) -> IResult<&str, String> {

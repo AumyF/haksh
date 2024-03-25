@@ -1,3 +1,1 @@
-using line = fs.watch
-println line
-println {fs.cwd}
+http.post.json "https://discord.com/api/webhooks/1221708327709310996/Vzx1wPgZFXZeSlqoqDCw-EoUhH_ItQr_oXD3h3k8bG1LwJ63bDiiZInZDvxjtlIIDhqy" (content="Hello")

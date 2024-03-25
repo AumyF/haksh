@@ -1,7 +1,7 @@
 use crate::ast::*;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Properties(BTreeMap<String, Value>);
 
 #[derive(Debug, Clone)]
@@ -33,21 +33,25 @@ impl Environment {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum Value {
     Compound {
         properties: Properties,
-    },
-    UInt64(u64),
-    Bool(bool),
-    Unit,
-    String(String),
+    },#[serde(skip)]
     Fn {
         env: Environment,
         body: Block,
         params: Vec<String>,
         name: Option<String>,
     },
+    Unit,
+    #[serde(untagged)]
+    UInt64(u64),
+    #[serde(untagged)]
+    Bool(bool),
+    #[serde(untagged)]
+    String(String),
+    
 }
 
 impl Value {
@@ -61,6 +65,12 @@ impl Value {
         match self {
             Value::String(s) => Some(s.to_string()),
             _ => None,
+        }
+    }
+    fn try_get_compound(&self) -> Option<Properties> {
+        match self {
+            Value::Compound { properties } => Some(properties.clone()),
+            _ => None
         }
     }
  fn try_evaluate_as_fn(&self, arguments: Vec<Value>) -> EvalResult {
@@ -189,6 +199,13 @@ impl PrimaryExpr {
                 .get(name)
                 .cloned()
                 .ok_or(format!("no variable named {name} found")),
+                PrimaryExpr::Compound(c) => {
+                let a = c.iter().map(|(k, v)| v.evaluate(env).map(|v| (k.to_string(), v))).collect::<Result<std::collections::BTreeMap<_,_>, String>>()?;
+
+                Ok(Value::Compound{properties:Properties(a)})
+
+
+            }
         }
     }
 }
@@ -313,6 +330,35 @@ impl FunctionApplication {
 
                 Ok(Value::String(body))
             }
+i if i
+                == Identifier {
+                    path: "http".to_string(),
+                    child: Some(Box::new(Identifier {
+                        path: "post".to_string(),
+                        child: Some(Box::new(Identifier {
+                            path: "json".to_string(),
+                            child: None,
+                        })),
+                    })),
+                } =>
+            {
+                let mut  args = self.args.clone();
+                let body = args.pop().ok_or("no arguments")?.evaluate(env)?;
+                let url = args.pop().ok_or("no arguments")?.evaluate(env)?;
+                let url = url.try_get_string().ok_or(format!("{url:?} is not string"))?;
+                let body = body.try_get_compound().ok_or(format!("{url:?} is not compound"))?;
+                
+                let client = reqwest::blocking::Client::new();
+                let body = serde_json::to_string(&body.0).map_err(|e|e.to_string())?;
+                let res = client.post(url).header("Content-Type", "application/json").body(body).send().map_err(|e| e.to_string())?;
+
+                    
+
+                let body = res.text().map_err(|e| e.to_string())?;
+
+                Ok(Value::String(body))
+            }
+
 
             i if i
                 == Identifier {

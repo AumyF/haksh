@@ -5,6 +5,7 @@ pub enum PrimaryExpr {
     DecimalInt(u64),
     Identifier(String),
     StringLiteral(String),
+    Compound(std::collections::BTreeMap<String, Expr>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
