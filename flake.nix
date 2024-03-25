@@ -11,10 +11,12 @@
           # Replace llvmPackages with llvmPackages_X, where X is the latest LLVM version (at the time of writing, 16)
           llvmPackages_17.bintools
           rustup
+          pkg-config
         ];
         RUSTC_VERSION = pkgs.lib.readFile ./rust-toolchain;
         # https://github.com/rust-lang/rust-bindgen#environment-variables
         LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_17.libclang.lib ];
+        PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/";
         shellHook = ''
           export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
           export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/

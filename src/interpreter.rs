@@ -284,40 +284,22 @@ impl FunctionApplication {
 
                 Ok(Value::Unit)
             }
+
             i if i
                 == Identifier {
-                    path: "fs".to_string(),
+                    path: "http".to_string(),
                     child: Some(Box::new(Identifier {
-                        path: "read".to_string(),
+                        path: "post".to_string(),
                         child: None,
                     })),
                 } =>
             {
-                use std::fs::File;
-                use std::io::prelude::*;
-                let f = File::open("./latest.log").map_err(|e| e.to_string())?;
+                let res =
+                    reqwest::blocking::get("https://example.com").map_err(|e| e.to_string())?;
 
-                let mut bufr = std::io::BufReader::new(f);
+                let body = res.text().map_err(|e| e.to_string())?;
 
-                let mut string = String::new();
-                let cont = self
-                    .args
-                    .last()
-                    .ok_or("no arguments".to_string())?
-                    .evaluate(env)?;
-
-                while let Ok(len) = bufr.read_line(&mut string) {
-                    if len == 0 {
-                        // EOF
-                        break;
-                    }
-
-                    // TODO unwrap
-                    cont.try_evaluate_as_fn(vec![Value::String(string.clone())])
-                        .unwrap();
-                }
-
-                Ok(Value::Unit)
+                Ok(Value::String(body))
             }
 
             i if i
@@ -386,7 +368,6 @@ impl FunctionApplication {
                         Err(e) => eprintln!("watch error: {:?}", e),
                     }
                 }
-
 
                 Ok(Value::Unit)
             }

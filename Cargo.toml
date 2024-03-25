@@ -13,3 +13,4 @@ regex = "1.10.3"
 nom-recursive = "0.5.0"
 notify = "6.1.1"
 notify-debouncer-full = "0.3.1"
+reqwest = {  version = "0.12.1", features=["blocking"] }
