@@ -195,6 +195,13 @@ impl PrimaryExpr {
             PrimaryExpr::Block(b) => b.evaluate(&env),
             PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
             PrimaryExpr::StringLiteral(s) => Ok(Value::String(s.clone())),
+            PrimaryExpr::TaggedString(ts) => {
+                match ts {
+                    TaggedString::Regex(r) => {
+                        todo!("implement regex");
+                    }
+                }
+            }
             PrimaryExpr::Identifier(name) => env
                 .get(name)
                 .cloned()

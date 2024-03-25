@@ -5,7 +5,12 @@ pub enum PrimaryExpr {
     DecimalInt(u64),
     Identifier(String),
     StringLiteral(String),
+    TaggedString (TaggedString),
     Compound(std::collections::BTreeMap<String, Expr>)
+}
+#[derive(Debug, Clone)]
+pub enum TaggedString {
+    Regex(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
