@@ -178,6 +178,7 @@ impl PrimaryExpr {
             PrimaryExpr::Bool(b) => Ok(b.evaluate()),
             PrimaryExpr::Block(b) => b.evaluate(&env),
             PrimaryExpr::DecimalInt(n) => Ok(Value::UInt64(*n)),
+            PrimaryExpr::StringLiteral(s) => Ok(Value::String(s.clone())),
             PrimaryExpr::Identifier(name) => env
                 .get(name)
                 .cloned()

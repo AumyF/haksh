@@ -4,6 +4,7 @@ pub enum PrimaryExpr {
     Block (Block),
     DecimalInt(u64),
     Identifier(String),
+    StringLiteral(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{tag,take_until},
     character::complete::{char, line_ending, multispace0, space0, space1, u64},
     combinator::{eof, map},
     error::ParseError,
@@ -158,12 +158,17 @@ fn pbool(input: &str) -> IResult<&str, BoolLiteral> {
     alt((pf, pt))(input)
 }
 
+fn pstring(input: &str) -> IResult<&str, String> {
+    map(delimited(char('"'), take_until(r#"""#) ,char('"')), |s: &str| s.to_string())(input)
+}
+
 pub fn primary_expr(input: &str) -> IResult<&str, PrimaryExpr> {
     let pb = map(pbool, |b| PrimaryExpr::Bool(b));
     let block = map(block, |b| PrimaryExpr::Block(Block(b)));
     let u = map(u64, |u| PrimaryExpr::DecimalInt(u));
     let id = map(identifer, |id| PrimaryExpr::Identifier(id));
-    alt((pb, block, u, id))(input)
+    let ps = map(pstring, PrimaryExpr::StringLiteral);
+    alt((pb, block, u, id, ps))(input)
 }
 
 fn identifer(input: &str) -> IResult<&str, String> {
